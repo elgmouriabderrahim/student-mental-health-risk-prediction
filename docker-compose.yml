@@ -1,7 +1,11 @@
 services:
   airflow:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     command: airflow standalone
+    image: mental-health-airflow:0.1
+    container_name: mental-health-airflow
     ports:
       - "8080:8080"
     environment:
@@ -13,8 +17,11 @@ services:
       - workflow_processed:/opt/airflow/data/processed
 
   streamlit:
-    build: .
-    command: streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    image: mental-health-streamlit:0.1
+    container_name: mental-health-streamlit
     ports:
       - "8501:8501"
     environment:

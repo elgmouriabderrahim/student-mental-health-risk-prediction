@@ -118,3 +118,50 @@ def create_pipeline() -> Pipeline:
             ("model", LogisticRegression(max_iter=3000, random_state=RANDOM_STATE)),
         ]
     )
+
+
+def prepare_data(raw_path: str, output_dir: str) -> dict[str, int]:
+    """Load the raw data and save the same stratified 80/20 split as étape 2."""
+    raw_data = pd.read_csv(raw_path)
+    X = raw_data.drop(columns="Mental_Health_Risk")
+    y = raw_data["Mental_Health_Risk"].map(RISK_MAPPING)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.20,
+        random_state=RANDOM_STATE,
+        stratify=y,
+    )
+
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    X_train.to_csv(output / "X_train.csv", index=False)
+    X_test.to_csv(output / "X_test.csv", index=False)
+    y_train.to_csv(output / "y_train.csv", index=False)
+    y_test.to_csv(output / "y_test.csv", index=False)
+
+    return {"train_rows": len(X_train), "test_rows": len(X_test)}
+
+
+def validate_preprocessing_inputs(processed_dir: str, report_path: str) -> dict[str, int]:
+    """Validate the inputs that will be transformed inside the training pipeline."""
+    processed = Path(processed_dir)
+    X_train = pd.read_csv(processed / "X_train.csv")
+    X_test = pd.read_csv(processed / "X_test.csv")
+
+    missing_columns = set(REQUIRED_COLUMNS) - set(X_train.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {sorted(missing_columns)}")
+
+    report = {
+        "train_rows": len(X_train),
+        "test_rows": len(X_test),
+        "train_missing_values": int(X_train.isna().sum().sum()),
+        "test_missing_values": int(X_test.isna().sum().sum()),
+    }
+
+    report_file = Path(report_path)
+    report_file.parent.mkdir(parents=True, exist_ok=True)
+    report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return report

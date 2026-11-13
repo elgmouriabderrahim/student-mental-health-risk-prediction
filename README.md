@@ -15,6 +15,7 @@ An end-to-end machine-learning project that predicts a university student's ment
 - [Run the notebooks](#run-the-notebooks)
 - [Run Airflow](#run-airflow)
 - [Run Streamlit](#run-streamlit)
+- [Run with Docker](#run-with-docker)
 - [Use the saved model](#use-the-saved-model)
 - [Limitations](#limitations)
 
@@ -244,6 +245,42 @@ The application has two tabs:
 
 - **Model performance:** accuracy, precision, recall, F1-score, ROC-AUC, classification report, metric chart, and confusion matrix.
 - **New prediction:** a form for entering a student's features, then displaying predicted risk and class probabilities.
+
+## Run with Docker
+
+Docker Compose starts the Airflow service and the Streamlit dashboard with one command. The two services share volumes for the processed data and model artifacts, so the dashboard receives the metrics created by the DAG.
+
+### Prerequisites
+
+- Docker Engine
+- Docker Compose v2
+
+From the project root, build and start both services:
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+| Service | Address | Purpose |
+|---|---|---|
+| Airflow | `http://localhost:8080` | Trigger the DAG and monitor tasks, logs, retries, and failures. |
+| Streamlit | `http://localhost:8501` | View model results and test new predictions. |
+
+Airflow prints the generated `admin` password in the terminal when it starts for the first time. In the Airflow UI, enable and trigger `student_mental_health_training`. When the DAG finishes, refresh the Streamlit dashboard to see the latest metrics and confusion matrix.
+
+To stop the services:
+
+```bash
+docker compose down
+```
+
+To also remove Docker volumes, including the local Airflow database and generated workflow artifacts:
+
+```bash
+docker compose down -v
+```
 
 ## Use the saved model
 

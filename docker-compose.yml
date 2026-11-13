@@ -1,0 +1,31 @@
+services:
+  airflow:
+    build: .
+    command: airflow standalone
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW_HOME: /opt/airflow/airflow-home
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    volumes:
+      - airflow_state:/opt/airflow/airflow-home
+      - workflow_models:/opt/airflow/models
+      - workflow_processed:/opt/airflow/data/processed
+
+  streamlit:
+    build: .
+    command: streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8501:8501"
+    environment:
+      PYTHONPATH: /opt/airflow
+    volumes:
+      - workflow_models:/opt/airflow/models
+      - workflow_processed:/opt/airflow/data/processed
+    depends_on:
+      - airflow
+
+volumes:
+  airflow_state:
+  workflow_models:
+  workflow_processed:

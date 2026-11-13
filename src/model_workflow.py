@@ -165,3 +165,79 @@ def validate_preprocessing_inputs(processed_dir: str, report_path: str) -> dict[
     report_file.parent.mkdir(parents=True, exist_ok=True)
     report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report
+
+
+def train_model(processed_dir: str, model_path: str, training_report_path: str) -> dict:
+    """Tune and save the full model pipeline using training data only."""
+    processed = Path(processed_dir)
+    X_train = pd.read_csv(processed / "X_train.csv")
+    y_train = pd.read_csv(processed / "y_train.csv").squeeze("columns")
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    search = GridSearchCV(
+        estimator=create_pipeline(),
+        param_grid={
+            "model__C": [0.01, 0.1, 1, 10, 100],
+            "model__class_weight": [None, "balanced"],
+        },
+        scoring="f1_macro",
+        cv=cv,
+        n_jobs=-1,
+    )
+    search.fit(X_train, y_train)
+
+    model_file = Path(model_path)
+    model_file.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(search.best_estimator_, model_file)
+
+    report = {
+        "model": "Logistic Regression",
+        "best_cv_f1_macro": round(float(search.best_score_), 4),
+        "best_parameters": search.best_params_,
+    }
+    Path(training_report_path).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return report
+
+
+def evaluate_model(processed_dir: str, model_path: str, metrics_path: str, matrix_path: str) -> dict:
+    """Evaluate the saved model once on the independent test set."""
+    processed = Path(processed_dir)
+    X_test = pd.read_csv(processed / "X_test.csv")
+    y_test = pd.read_csv(processed / "y_test.csv").squeeze("columns")
+    pipeline = joblib.load(model_path)
+
+    y_pred = pipeline.predict(X_test)
+    y_probability = pipeline.predict_proba(X_test)
+    report = classification_report(
+        y_test,
+        y_pred,
+        target_names=CLASS_NAMES,
+        output_dict=True,
+        zero_division=0,
+    )
+
+    metrics = {
+        "model": "Logistic Regression",
+        "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
+        "precision_macro": round(
+            float(precision_score(y_test, y_pred, average="macro", zero_division=0)), 4
+        ),
+        "recall_macro": round(
+            float(recall_score(y_test, y_pred, average="macro", zero_division=0)), 4
+        ),
+        "f1_macro": round(
+            float(f1_score(y_test, y_pred, average="macro", zero_division=0)), 4
+        ),
+        "roc_auc_ovr_macro": round(
+            float(roc_auc_score(y_test, y_probability, multi_class="ovr", average="macro")), 4
+        ),
+        "high_risk_recall": round(float(report["High"]["recall"]), 4),
+        "classification_report": report,
+    }
+
+    metrics_file = Path(metrics_path)
+    metrics_file.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+    matrix = confusion_matrix(y_test, y_pred, labels=[0, 1, 2])
+    pd.DataFrame(matrix, index=CLASS_NAMES, columns=CLASS_NAMES).to_csv(matrix_path)
+    return metrics

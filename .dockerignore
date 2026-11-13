@@ -1,0 +1,11 @@
+.git
+.venv
+.airflow
+__pycache__
+*.py[cod]
+.ipynb_checkpoints
+data/processed
+models/model_metrics.json
+models/confusion_matrix.csv
+models/preprocessing_report.json
+models/training_report.json

@@ -75,10 +75,95 @@ def show_model_performance():
     st.pyplot(figure)
 
 
+def prediction_form():
+    """Render a form that sends one new student record to the saved pipeline."""
+    st.subheader("Test a new student")
+    if not MODEL_PATH.exists():
+        st.warning("The saved model is missing. Run the Airflow DAG first.")
+        return
+
+    with st.form("prediction_form"):
+        first_column, second_column = st.columns(2)
+
+        with first_column:
+            student_id = st.text_input("Student ID", value="NEW001")
+            age = st.number_input("Age", min_value=15, max_value=100, value=21)
+            year_of_study = st.number_input("Year of study", min_value=1, max_value=5, value=2)
+            sleep_hours = st.number_input("Sleep hours", min_value=0.0, max_value=24.0, value=7.0)
+            study_hours = st.number_input("Study hours per week", min_value=0.0, max_value=80.0, value=20.0)
+            gpa = st.number_input("GPA", min_value=0.0, max_value=4.0, value=3.0)
+            social_media_hours = st.number_input(
+                "Social media hours", min_value=0.0, max_value=24.0, value=3.0
+            )
+            screen_time_hours = st.number_input(
+                "Screen time hours", min_value=0.0, max_value=24.0, value=6.0
+            )
+
+        with second_column:
+            gender = st.selectbox("Gender", ["Female", "Male", "Non-binary"])
+            physical_activity = st.selectbox("Physical activity", ["Low", "Moderate", "High"])
+            financial_stress = st.number_input(
+                "Financial stress", min_value=1.0, max_value=10.0, value=5.0
+            )
+            family_support = st.number_input(
+                "Family support", min_value=1.0, max_value=10.0, value=5.0
+            )
+            attendance_rate = st.number_input(
+                "Attendance rate", min_value=0.0, max_value=100.0, value=80.0
+            )
+            part_time_job = st.selectbox("Part-time job", ["No", "Yes"])
+            diet_quality = st.selectbox("Diet quality", ["Poor", "Average", "Good"])
+            previous_history = st.selectbox(
+                "Previous mental health history", ["No", "Yes"]
+            )
+
+        submitted = st.form_submit_button("Predict risk")
+
+    if submitted:
+        student = pd.DataFrame(
+            [
+                {
+                    "Student_ID": student_id,
+                    "Age": age,
+                    "Gender": gender,
+                    "Year_of_Study": year_of_study,
+                    "Sleep_Hours": sleep_hours,
+                    "Study_Hours_Per_Week": study_hours,
+                    "GPA": gpa,
+                    "Social_Media_Hours": social_media_hours,
+                    "Screen_Time_Hours": screen_time_hours,
+                    "Physical_Activity": physical_activity,
+                    "Financial_Stress": financial_stress,
+                    "Family_Support": family_support,
+                    "Attendance_Rate": attendance_rate,
+                    "Part_Time_Job": part_time_job,
+                    "Diet_Quality": diet_quality,
+                    "Previous_Mental_Health_History": previous_history,
+                }
+            ]
+        )
+
+        model = load_model()
+        predicted_class = int(model.predict(student)[0])
+        probabilities = model.predict_proba(student)[0]
+
+        st.success(f"Predicted mental-health risk: {CLASS_NAMES[predicted_class]}")
+        probability_table = pd.DataFrame(
+            {"Risk level": CLASS_NAMES, "Probability": probabilities}
+        ).set_index("Risk level")
+        st.bar_chart(probability_table)
+
+
 def main():
     st.set_page_config(page_title="Student Mental Health Risk", layout="wide")
     st.title("Student Mental Health Risk Prediction")
-    show_model_performance()
+    st.write("Monitor the trained model and test predictions for new student data.")
+
+    performance_tab, prediction_tab = st.tabs(["Model performance", "New prediction"])
+    with performance_tab:
+        show_model_performance()
+    with prediction_tab:
+        prediction_form()
 
 
 if __name__ == "__main__":

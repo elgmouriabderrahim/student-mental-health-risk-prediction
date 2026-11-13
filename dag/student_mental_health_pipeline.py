@@ -38,3 +38,56 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
     "on_failure_callback": log_failure,
 }
+
+
+with DAG(
+    dag_id="student_mental_health_training",
+    description="Prepare data, train, and evaluate the mental-health risk model.",
+    start_date=datetime(2026, 1, 1),
+    schedule="0 2 * * 1",
+    catchup=False,
+    default_args=default_args,
+    tags=["machine-learning", "student-mental-health"],
+) as dag:
+    prepare_data_task = PythonOperator(
+        task_id="prepare_data",
+        python_callable=prepare_data,
+        op_kwargs={
+            "raw_path": str(DATA_DIR / "raw/student_mental_health.csv"),
+            "output_dir": str(PROCESSED_DIR),
+        },
+    )
+
+    preprocessing_task = PythonOperator(
+        # The actual fitting of transformations happens inside train_model's
+        # scikit-learn pipeline, preventing data leakage during cross validation.
+        task_id="preprocess_data",
+        python_callable=validate_preprocessing_inputs,
+        op_kwargs={
+            "processed_dir": str(PROCESSED_DIR),
+            "report_path": str(MODELS_DIR / "preprocessing_report.json"),
+        },
+    )
+
+    training_task = PythonOperator(
+        task_id="train_model",
+        python_callable=train_model,
+        op_kwargs={
+            "processed_dir": str(PROCESSED_DIR),
+            "model_path": str(MODELS_DIR / "mental_health_risk_pipeline.joblib"),
+            "training_report_path": str(MODELS_DIR / "training_report.json"),
+        },
+    )
+
+    evaluation_task = PythonOperator(
+        task_id="evaluate_model",
+        python_callable=evaluate_model,
+        op_kwargs={
+            "processed_dir": str(PROCESSED_DIR),
+            "model_path": str(MODELS_DIR / "mental_health_risk_pipeline.joblib"),
+            "metrics_path": str(MODELS_DIR / "model_metrics.json"),
+            "matrix_path": str(MODELS_DIR / "confusion_matrix.csv"),
+        },
+    )
+
+    prepare_data_task >> preprocessing_task >> training_task >> evaluation_task
